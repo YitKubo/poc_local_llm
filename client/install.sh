@@ -12,6 +12,7 @@
 # Then:  llm "hello"    llm chat
 #        llm-agent "run uname -r"          the model runs shell commands; asks y/N before each (default)
 #        llm-agent --auto "run uname -r"   same, but runs them without asking
+#        llm-agent                         same, as an interactive chat (add --auto to skip asking)
 set -euo pipefail
 
 usage() { echo "usage: $0 <server-url e.g. http://host:4000> <virtual-key>" >&2; }
@@ -67,7 +68,8 @@ mkdir -p ~/.local/bin
 cat > ~/.local/bin/llm-agent <<'SHEOF'
 #!/usr/bin/env bash
 # llm-agent: let the model run shell commands (llm tool calling). Written by install.sh.
-#   llm-agent [--ask|--auto] "<prompt>"
+#   llm-agent [--ask|--auto] "<prompt>"   one shot: answer the prompt and exit
+#   llm-agent [--ask|--auto]              interactive chat (type "exit" or Ctrl-D to quit)
 #   --ask   (default) show each command and ask y/N before running it
 #   --auto  run every command the model asks for, without asking
 set -euo pipefail
@@ -75,17 +77,22 @@ mode=ask
 case "${1:-}" in
   --ask) shift;;
   --auto) mode=auto; shift;;
-  -h|--help|"") sed -n '3,5p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
+  -h|--help) sed -n '3,6p' "$0" | sed 's/^# \{0,1\}//'; exit 0;;
 esac
-[ $# -ge 1 ] || { echo 'usage: llm-agent [--ask|--auto] "<prompt>"' >&2; exit 1; }
-if [ "$mode" = ask ] && [ ! -t 0 ]; then
+cmd=(llm)
+if [ $# -eq 0 ]; then
+  [ -t 0 ] || { echo "llm-agent: chat needs a terminal; give a prompt for one-shot use" >&2; exit 1; }
+  cmd+=(chat)
+elif [ "$mode" = ask ] && [ ! -t 0 ]; then
   echo "llm-agent: --ask needs a terminal on stdin to ask you (use --auto to run unattended)" >&2
   exit 1
 fi
-args=(--functions "$(dirname "$(llm logs path)")/agent_tools.py" --td)
+# a small model sometimes answers "I cannot run commands" unless told it has the tool
+system="You can run shell commands on the user's computer with the run_shell tool. When the user asks you to run a command or check something on the computer, call run_shell instead of saying you cannot. After the tool result arrives, answer from that result."
+args=(-s "$system" --functions "$(dirname "$(llm logs path)")/agent_tools.py" --td)
 [ "$mode" = ask ] && args+=(--ta)
 echo "llm-agent: mode=$mode" >&2
-exec llm "${args[@]}" "$@"
+exec "${cmd[@]}" "${args[@]}" "$@"
 SHEOF
 chmod +x ~/.local/bin/llm-agent
 
