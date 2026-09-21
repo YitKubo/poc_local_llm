@@ -12,7 +12,10 @@
         "toolCalling": true,
         "vision": false,
         "maxInputTokens": 8000,
-        "maxOutputTokens": 2048
+        "maxOutputTokens": 2048,
+        "requestHeaders": {
+          "Authorization": "Bearer ${apiKey}"
+        }
       }
     ]
   }
