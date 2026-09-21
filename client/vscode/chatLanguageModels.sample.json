@@ -2,7 +2,7 @@
   {
     "name": "poc_local_llm",
     "vendor": "customendpoint",
-    "apiKey": "${input:pocLocalLlmKey}",
+    "apiKey": "sk-REPLACE_WITH_YOUR_VSCODE_KEY",
     "apiType": "chat-completions",
     "models": [
       {

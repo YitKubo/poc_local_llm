@@ -139,4 +139,9 @@ VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code �
 
 - 実機の Ask / Agent / Edit の動作、体感速度、Copilot が並行して投げるリクエストでの 429 の出方（VS Code での登録後に実施）
 - `chat.utilityModel` / `chat.utilitySmallModel` にローカルモデルを指定した書式が効くか
-- `${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか（VS Code の文書の記述に従っただけ）
+- ~~`${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか~~ → **動かなかった（実機）**。任意の名前（`${input:pocLocalLlmKey}`）だと、キーの入力を求められず、LiteLLM に 401 が 2 件届いた。VS Code が解決するのは `chat.lm.secret.` で始まる名前だけ（workbench の `SECRET_KEY_PREFIX` を確認）。サンプルは `apiKey` に直接キーを書く形に改めた。
+
+### VS Code 実機での初回試行（1.138.0、`local-llm` プロファイル、2026-09-22）
+
+- モデルピッカーに `local-qwen (poc_local_llm)` が出て、選択できた（登録は成功）。
+- 上記のとおり 401。あわせて Copilot 拡張が送信前にプロンプトを組み立てられず `No lowest priority node found` で失敗した（サーバには届いていない）。プロンプトの固定部分（システムプロンプト + ツール定義）が `maxInputTokens: 8000` に収まらないと見られる。原因の切り分けは次の節。

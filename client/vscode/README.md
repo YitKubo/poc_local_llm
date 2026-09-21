@@ -23,7 +23,9 @@ cd server && ./scripts/create_keys.sh vscode     # 出力された sk-... を受
 0. **GitHub Copilot Chat が使えること。** 最近の VS Code（1.135 で確認）は Copilot Chat が本体に組み込みで、拡張の追加は要らない（`code --list-extensions` に出ないのはそのため）。古い VS Code では拡張 `GitHub.copilot-chat` を入れる。
 1. コマンドパレット → `Chat: Manage Language Models` → `Add Models` → `Custom Endpoint`。`chatLanguageModels.json` が開く。
 2. [chatLanguageModels.sample.json](chatLanguageModels.sample.json) の内容を貼る（すでに他のプロバイダがあれば、配列の要素として 1 つ足す）。
-3. `apiKey` は `${input:pocLocalLlmKey}` のまま。初回利用時にキーの入力を求められるので `sk-...` を入れる。生のキーをファイルに書かずに済む。
+3. `apiKey` の `sk-REPLACE_WITH_YOUR_VSCODE_KEY` を、受け取った VS Code 専用のキーに置き換える。**キーはこのファイルに平文で残る**（VS Code のプロファイルのフォルダ内で、リポジトリには入らない）。専用キーは同時 2 本・日次の予算つきに絞ってあるので、漏れても被害は小さい。
+   - 平文を避けたいときは、`Chat: Manage Language Models` の画面から `Add Models` → `Custom Endpoint` の流れで追加する。VS Code がキーを安全な保管場所に入れ、ファイルには `${input:chat.lm.secret.…}` という参照だけを書く。
+   - **`${input:好きな名前}` は使えない。** VS Code が解決するのは `chat.lm.secret.` で始まる名前だけで、任意の名前を書くとキーが送られず 401 になる（実機で確認）。
 4. チャットのモデルピッカーから `local-qwen (poc_local_llm)` を選ぶ。
 
 サーバが別マシンなら、サンプルの `url` の `localhost` をそのホスト名に変える。URL は `/v1/chat/completions` まで書く。
@@ -84,7 +86,7 @@ BYOK のモデルだけなら GitHub アカウント／サブスクリプショ�
 
 | 症状 | 見るところ |
 |---|---|
-| 401 | キーが違う、または `llm` CLI 用のキーを渡していないか。`curl -H "Authorization: Bearer sk-..." http://localhost:4000/v1/models` で `local-qwen` が見えるか |
+| 401 | キーが違う。`apiKey` に `${input:…}` の任意名を書いていないか（上記）、または `llm` CLI 用のキーを渡していないか。`curl -H "Authorization: Bearer sk-..." http://localhost:4000/v1/models` で `local-qwen` が見えるか |
 | 404 | `url` が `/v1/chat/completions` まで含んでいるか（`/v1` で止めると 404。`/chat/completions` だけでも通るが、`/v1` 付きに揃える） |
 | 403 `key not allowed to access model` | `id` が `local-qwen` と一致しているか。キーはこのモデルにしか許可されていない |
 | 429 | 同時 2 本を超えた。少し待って再送。他のクライアントと同じキーを使っていないか |
