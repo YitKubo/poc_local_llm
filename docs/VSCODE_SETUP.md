@@ -132,13 +132,52 @@
 
 Copilot 拡張が、サーバへ送る前にプロンプトを組み立てられずに失敗したエラー。サーバには届いていない。**原因は未確認**。プロンプトの固定部分が `maxInputTokens: 8000` に収まらなかった可能性がある、というのは推測。認証を直した後の Ask モードでは、このエラーは出ずに送信できた。
 
-### 3.4 「Considering」のまま返答が出ない（遅い）
+### 3.4 「こんにちは」が数分かかる（遅い）
 
-同じ「こんにちは」が、端末の `llm` では数秒、Copilot では数分かかる。
+同じ「こんにちは」が、端末の `llm` では数秒、Copilot では約 4 分（252 秒）かかった。原因は 3 つ重なっている（LiteLLM の記録と Copilot のログで確認）。
 
-- llama.cpp のログでは、入力の処理が 4,094 トークンで進捗 47%（約 42〜48 tok/s）。入力は合計約 **8,700 トークン**と逆算できる
-- 8,700 ÷ 45 ≒ **約 190 秒**。以前の API 直叩きの実測（8,897 トークンで 150 秒）と同じ傾向
-- 端末の入力は十数トークン。差は、Copilot が毎回付ける文脈（システムプロンプト・ツール定義・環境情報など）による入力の大きさ。**内訳の比率は未測定**
+1. **入力が大きい。** 本体のリクエストの入力が 8,743 トークン（端末は十数トークン）。CPU のみで約 45 tok/s なので、読み込みだけで約 190 秒
+2. **同じモデルに、要約のリクエストが並行して届く。** Copilot の `ConversationHistorySummarizer` が、会話履歴の要約を `local-qwen` に依頼する（入力 1,326〜1,342、出力 407〜539 トークン）。CPU を取り合い、要約の生成は 1.5〜7 tok/s まで落ち、本体も約 60 秒延びた
+3. **待っている間の再送・キャンセルが積み重なる。** ログに `cancelled` が多数
+
+なお、タイトル生成（`[title]`）は Copilot 側のクラウドの `gpt-4o-mini` に行くので、ローカルの負荷にならない。
+
+対策の候補（いずれも**効果は未検証**）:
+- **新しいチャットで送る。** 履歴が無いと `no prior content to summarize, skipping` となり、要約が走らない
+- **待っている間は再送・キャンセルしない。** 本体は約 4 分で返る
+- **ツールを減らして入力を小さくする**（チャット入力欄のツール設定）。Agent より Ask のほうが小さいはず
+- 根本的には、GPU か、より小さな入力でも動く構成が必要
+
+### 3.5 Copilot の CLI（`copilot`）で、私が自分で検証した
+
+VS Code のチャットを人が操作せずに、Copilot 自身のプロンプトがサーバにどう届くかを測るため、Copilot の CLI（`copilot` 1.0.86。VS Code の Copilot 拡張が `~/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli/` に置いたもの）を、自前サーバに向けて実行した。CLI は環境変数だけで OpenAI 互換のサーバに向けられる（`COPILOT_PROVIDER_BASE_URL` など。GitHub 認証は不要）。
+
+条件: 空の作業フォルダ、ツールの実行は許可しない、キーは `client/vscode/.env` から環境変数に渡す（画面・ログには出さない）。
+
+```bash
+export COPILOT_OFFLINE=true
+export COPILOT_PROVIDER_BASE_URL=http://localhost:4000/v1
+export COPILOT_PROVIDER_TYPE=openai
+export COPILOT_PROVIDER_API_KEY=<.env の LLM_SERVER_KEY>
+export COPILOT_MODEL=local-qwen COPILOT_PROVIDER_WIRE_MODEL=local-qwen COPILOT_PROVIDER_MODEL_ID=local-qwen
+export COPILOT_PROVIDER_MAX_PROMPT_TOKENS=14000 COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=2048
+copilot --model local-qwen -p "こんにちは" --no-ask-user --no-auto-update --no-remote --no-color --no-custom-instructions --log-dir <dir> --log-level debug
+```
+
+| 回 | 設定 | 結果 |
+|---|---|---|
+| 1 | 上限 8000、`--model` なし | 送信せずに終了: `Static system messages and tool definitions exceed the model's usable context budget`（この回は `claude-sonnet-4.6` 用の設定で組まれていた） |
+| 2 | 上限 14000、`--model` なし | 同じエラー |
+| 3 | 上限 100000、`--model` なし | 検査を通って送信されたが **403**。CLI が環境変数 `COPILOT_MODEL` を無視し、既定のモデル名 `claude-sonnet-4.6` を送っていた（キーは `local-qwen` だけ許可） |
+| 4 | 上限 14000、**`--model local-qwen`** | **成功**（下記） |
+| 5 | 上限 **8000**、`--model local-qwen` | **送信せずに拒否**（回 1 と同じエラー。サーバへの POST は 0 件） |
+
+- 回 1・2 は、別のモデル名（`claude-sonnet-4.6`）用の設定で固定部分が組まれ、14000 でも超えた（100000 では通った）。`local-qwen` の設定では、14000 で通り（回 4）、8000 では拒否された（回 5）。つまり **`local-qwen` の固定部分は 8000 を超え、14000 未満**で、回 4 の実測では 10,710 トークン
+- 回 4 の結果: 「こんにちは」に対して、返答は日本語で正しく返った（`こんにちは！GitHub Copilot CLI を使用して、…`）。**入力 10,710 トークン、出力 24 トークン、合計 5 分 16 秒**（入力の処理 311 秒 = 34 tok/s、生成 4.2 秒）
+- 入力の内訳: システムメッセージが **20,935 文字**。ユーザーの発話は 73 文字（日時 + 「こんにちは」）。サーバが数えたトークン数（10,710）と文字数（約 21,000）が合わないため、残りの約 5,500 トークンは **17 個のツール定義**と見られる（ログの `tool_count: 17`。ただし、リクエストの記録では `tools` が空で、直接は確認できていない）
+- **結論**: Copilot は、「こんにちは」の 1 語でも、**約 1 万トークンの固定の入力**を毎回付ける。このサーバ（CPU のみ、約 35〜50 tok/s）では、それだけで 4〜5 分かかる。VS Code の Ask（8,743 トークン、252 秒）と、Copilot CLI（10,710 トークン、316 秒）は、ほぼ同じ規模。
+- VS Code で最初に出た `No lowest priority node found`（3.3）は、この固定部分が `maxInputTokens: 8000` に収まらないときの失敗と同じ原因の可能性が高い（Agent は Ask より大きいはず）。CLI では 8000 で拒否されるのを確認（回 5）。ただし、VS Code 側では未確認。
+- **上限（`maxInputTokens`）を上げれば動くが、待ちも増える。** サーバの文脈長は 16384 で、入力 + 出力（2048）がそれに収まる必要がある。
 
 ## 4. 確認できたこと / 未確認
 
@@ -148,9 +187,9 @@ Copilot 拡張が、サーバへ送る前にプロンプトを組み立てられ
 | VS Code でモデルを登録・選択できる | 確認済み |
 | 認証が通り、llama.cpp まで届く（`POST /v1/chat/completions` が 200） | 確認済み |
 | ツール呼び出し（`tool_calls`、ストリーミング含む） | API 直叩きで確認済み |
-| 返答が最後まで返るまでの所要時間 | **未確認** |
+| 返答が最後まで返るまでの所要時間 | 確認済み: VS Code の Ask で **252 秒**（入力 8,743 トークン）、Copilot CLI で **316 秒**（入力 10,710 トークン）。いずれも「こんにちは」 |
 | 2 通目以降でプロンプトキャッシュが効き、短くなるか | **未確認** |
-| ツールを減らしたときの入力の大きさ | **未確認** |
+| ツールを減らしたときの入力の大きさ | **未確認**（CLI の固定部分は 10,710 トークン。うちツール定義は約 5,500 と推測） |
 | Agent / Edit / Plan の実機での動作 | **未確認** |
 | `chat.utilityModel` / `chat.utilitySmallModel` をローカルモデルに向ける書式 | **未確認** |
 | キーを画面から入れる経路（`Add Models` → `Custom Endpoint`。暗号化保管） | **未検証** |
@@ -172,3 +211,35 @@ Copilot 拡張が、サーバへ送る前にプロンプトを組み立てられ
 - 認証ヘッダ: 拡張が `Authorization: Bearer ${apiKey}` を既定で作る。`requestHeaders` に `api-key` / `authorization` / `x-api-key` / `x-goog-api-key` / `apikey` があれば、既定の認証ヘッダは付けず、その値を使う。値の中の `${apiKey}` だけが置換される
 - ワークスペース側の `chat.tools.terminal.autoApprove` を Copilot が読まない不具合の報告がある: https://github.com/microsoft/vscode/issues/336715 （このため `.vscode/settings.json` で自動承認を止める方法は使っていない）
 - Copilot Chat のログ（WSL 側）: `~/.vscode-server/data/logs/<日時>/exthost1/GitHub.copilot-chat/GitHub Copilot Chat.log`
+
+## 7. 経緯（時系列）
+
+作業日: 2026-09-21〜22。「GitHub Copilot とこのローカル LLM サーバをつなぐ方法を検討して」という依頼から始まった。
+
+| # | 何をしたか | 結果・判断 |
+|---|---|---|
+| 1 | 既存の構成を調べた | LiteLLM（`:4000`）→ llama.cpp、Qwen2.5-1.5B、ctx 16384 を 4 スロット共有。エディタ連携は無し。`llm` CLI だけがクライアント |
+| 2 | Copilot 側の仕様を調べた | VS Code の Copilot Chat に **Custom Endpoint（BYOK）** があり、OpenAI 互換の URL を登録できる。インライン補完（Tab）・意味検索・embeddings は BYOK では使えない |
+| 3 | 方針を確認した | ①Ask / Agent などを全部試したい ②**サーバは変更しない** ③成果物は `client/` に手順とサンプル |
+| 4 | `client/vscode/` と `docs/` を作成 | 手順書・サンプル JSON・計測記録 |
+| 5 | VS Code に触る前に、API を直接叩いて検証 | `tool_calls`（ストリーミング含む）は通る。**入力の処理（prefill）が約 42〜59 tok/s**で、8,900 トークンで最初の文字まで 150 秒。`maxInputTokens` を 12000 → 8000 に下げた |
+| 6 | 誤り①: Copilot 拡張が「未導入」と書いた | 実際は VS Code 1.135 に**組み込み済み**（拡張の一覧に出ないだけ）。訂正した |
+| 7 | 誤り②に気づく前に、ユーザー設定を確認した | `chat.tools.terminal.autoApprove` に `rm`・`sudo`・`git commit` などが `true`。1.5B のモデルの Agent にも効くため、**空の専用プロファイル `local-llm`** で試すことにした |
+| 8 | VS Code を更新（1.135 → 1.138） | 1 回目の「再起動」は、アプリが完全に終了しておらず更新されなかった（メインプロセスの起動時刻で判明）。全ウィンドウを閉じて 2 回目で成功 |
+| 9 | プロファイルを作成して、モデルを登録 | WSL 側の `code` に `--profile` は無く、画面（`Profiles: Create Profile...`）で作成。登録ファイルは私が書き込んだ |
+| 10 | モデルが選べなかった | `Chat: Change Model` はパレットに出ない内部コマンドだった（私の案内の誤り）。`Ctrl+Alt+.` で選べた |
+| 11 | `No lowest priority node found` | 最初の試行で 1 回。原因は未確認（3.3） |
+| 12 | **401 が続いた** | `apiKey` に `${input:任意名}`・平文・`Bearer ${apiKey}` を試して全部失敗。コードを読んで原因を特定: `apiKey` は暗号化保管庫の参照だけを解決し、平文は空になる。`requestHeaders` にキーを直接書いて解決（3.1）。**途中で私は「平文のキーで動く」と誤って説明し、「古いエラーの貼り直し」とも誤認した** |
+| 13 | サンプルが毎回コミットされ、キーが入る危険を指摘された | キーを追跡対象に書かない運用へ。`.env`（`.gitignore` 済み）+ `apply.sh` + pre-commit フック（2.5）。履歴にキーが入っていないことも確認 |
+| 14 | 「こんにちは」が数分かかる | 3 本のリクエストが並行して届いていた。本体の入力は 8,743 トークン（252 秒）、要約が 2 本（3.4） |
+| 15 | **Copilot の CLI（`copilot`）で、私が自分で検証した** | 3.5。CLI は環境変数 `COPILOT_MODEL` を無視して別のモデル名を送った。指定し直すと、**「こんにちは」だけで入力が約 10,800 トークン**だった |
+
+### 私の誤りの一覧（訂正済み）
+
+| 誤り | 実際 |
+|---|---|
+| Copilot 拡張が未導入 | 組み込み済み |
+| `Chat: Change Model` でモデルを選べる | パレットに出ない。`Ctrl+Alt+.` |
+| `apiKey` に平文のキーを書けば動く | 空として扱われる。`requestHeaders` に書く |
+| 401 の再発を「古いエラーの貼り直し」と判断 | サーバのログでは新しいリクエストだった |
+| 遅いのは入力の大きさだけ | 要約の追加リクエストと CPU を取り合っていた |
