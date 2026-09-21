@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Undo what install.sh set up for this server. Only touches what install.sh wrote.
 #
-#   ./uninstall.sh           remove the server registration, the stored key, and the default model
+#   ./uninstall.sh           remove the server registration, llm-agent, the stored key, and the default model
 #   ./uninstall.sh --purge   also remove the `llm` CLI itself and its history (logs.db)
 #
 # --purge removes `llm` even if you had it before install.sh ran (install.sh cannot tell).
@@ -25,6 +25,15 @@ fi
 models_yaml="$cfg_dir/extra-openai-models.yaml"
 if [ -f "$models_yaml" ] && grep -q 'api_key_name: local-llm' "$models_yaml"; then
   rm -f "$models_yaml"; echo "removed $models_yaml"
+fi
+
+# 1b) the shell tool and the llm-agent wrapper (only if install.sh wrote them)
+if [ -f "$cfg_dir/agent_tools.py" ]; then
+  rm -f "$cfg_dir/agent_tools.py"; echo "removed $cfg_dir/agent_tools.py"
+fi
+agent="$HOME/.local/bin/llm-agent"
+if [ -f "$agent" ] && grep -q 'Written by install.sh' "$agent"; then
+  rm -f "$agent"; echo "removed $agent"
 fi
 
 # 2) stored virtual key; other keys in keys.json are left alone
