@@ -1,14 +1,24 @@
 #!/usr/bin/env bash
-# Set up the `llm` CLI (https://llm.datasette.io) on a client machine to talk to this server.
-#   ./scripts/setup_client.sh http://<server-host>:4000 sk-<your-virtual-key>
-# or with env:  LLMQ_URL=... LLMQ_KEY=... ./scripts/setup_client.sh
+# Set up the `llm` CLI (https://llm.datasette.io) on a client machine.
+# Self-contained: needs only the server URL and your virtual key. Nothing in server/ is used.
+#
+#   ./install.sh http://<server-host>:4000 sk-<your-virtual-key>
+# or with env:
+#   LLM_SERVER_URL=... LLM_SERVER_KEY=... ./install.sh
+#
+# Optional env:
+#   CLIENT_MODEL   model name published by the server (default: local-qwen)
+#
 # Then:  llm "hello"    llm chat
 set -euo pipefail
 
-URL="${1:-${LLMQ_URL:-}}"
-KEY="${2:-${LLMQ_KEY:-}}"
-MODEL_NAME="${CLIENT_MODEL:-local-qwen}"   # must match model_name in litellm_config.yaml
-[ -n "$URL" ] && [ -n "$KEY" ] || { echo "usage: $0 <url e.g. http://host:4000> <virtual-key>" >&2; exit 1; }
+usage() { echo "usage: $0 <server-url e.g. http://host:4000> <virtual-key>" >&2; }
+case "${1:-}" in -h|--help) usage; exit 0;; esac
+
+URL="${1:-${LLM_SERVER_URL:-}}"
+KEY="${2:-${LLM_SERVER_KEY:-}}"
+MODEL_NAME="${CLIENT_MODEL:-local-qwen}"
+[ -n "$URL" ] && [ -n "$KEY" ] || { usage; exit 1; }
 URL="${URL%/}"
 
 # 1) install `llm`: pipx if present, otherwise a private venv linked into ~/.local/bin
@@ -26,7 +36,7 @@ if ! command -v llm >/dev/null 2>&1; then
 fi
 LLM="$(command -v llm || echo "$HOME/.local/bin/llm")"
 
-# 2) register the endpoint as a model
+# 2) register the server as a model
 cfg_dir="$(dirname "$("$LLM" logs path)")"
 mkdir -p "$cfg_dir"
 cat > "$cfg_dir/extra-openai-models.yaml" <<EOF

@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 set -a; . ./.env; set +a
 
 URL="${LITELLM_URL:-http://127.0.0.1:4000}"
-MODEL="${CLIENT_MODEL:-local-qwen}"
+MODEL="${GATEWAY_MODEL:-local-qwen}"   # model_name in litellm_config.yaml
 
 for name in "$@"; do
   body=$(NAME="$name" MODEL="$MODEL" python3 - <<'EOF'

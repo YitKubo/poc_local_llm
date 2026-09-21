@@ -1,5 +1,5 @@
 model_list:
-  # model_name is what clients ask for (keep in sync with scripts/setup_client.sh).
+  # model_name is what clients ask for (the name clients use; published to them via client/README.md, keep in sync with CLIENT_MODEL there).
   - model_name: local-qwen
     litellm_params:
       # "openai/" prefix = generic OpenAI-compatible endpoint (llama.cpp server).

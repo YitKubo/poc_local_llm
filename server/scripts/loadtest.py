@@ -6,6 +6,9 @@
   fairness  one "heavy" key floods the server while a "light" key sends a single request;
             reports how long the light request waited for its first token.
 
+Standalone: stdlib only and no dependency on the rest of the repo, so this file can be copied
+to any machine that can reach the endpoint. The paths below assume you run from server/.
+
 Examples (llama.cpp published on loopback via docker-compose.debug.yml):
   set -a; . ./.env; set +a
   scripts/loadtest.py sweep --url http://127.0.0.1:8081 --key "$LLAMA_API_KEY" \
