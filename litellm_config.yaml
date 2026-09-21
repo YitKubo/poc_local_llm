@@ -1,0 +1,20 @@
+model_list:
+  # model_name is what clients ask for (keep in sync with scripts/setup_client.sh).
+  - model_name: local-qwen
+    litellm_params:
+      # "openai/" prefix = generic OpenAI-compatible endpoint (llama.cpp server).
+      # The part after the prefix is sent as "model"; keep it equal to MODEL_ALIAS in .env.
+      model: openai/Qwen2.5-1.5B-Instruct
+      api_base: http://llama:8080/v1
+      api_key: os.environ/LLAMA_API_KEY
+      # Budgets run on cost, so map tokens to nominal money (1e-7 per token).
+      # DAILY_BUDGET=0.4 therefore means 4,000,000 tokens/day per key.
+      input_cost_per_token: 0.0000001
+      output_cost_per_token: 0.0000001
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+
+litellm_settings:
+  callbacks: ["prometheus"]

@@ -1,0 +1,8 @@
+# Overlay for sizing measurements only:
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+# Publishes llama.cpp on the host LOOPBACK so scripts/loadtest.py can bypass LiteLLM.
+# Not reachable from other machines. Do not use for normal operation.
+services:
+  llama:
+    ports:
+      - "127.0.0.1:8081:8080"
