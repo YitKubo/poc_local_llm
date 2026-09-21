@@ -20,7 +20,7 @@ GPU なしの端末で動かす、検証用のローカル LLM サーバ + CLI �
 | ディレクトリ | 役割 | 読むもの |
 |---|---|---|
 | [`server/`](server/) | サーバ一式（docker compose、設定、モデル、キー発行・負荷試験スクリプト） | [server/README.md](server/README.md) |
-| [`client/`](client/) | クライアント導入スクリプトと使い方 | [client/README.md](client/README.md) |
+| [`client/`](client/) | クライアント導入スクリプトと使い方（`llm` CLI。VS Code Copilot Chat 用の手順は [`client/vscode/`](client/vscode/)） | [client/README.md](client/README.md) |
 | [`docs/`](docs/) | 設計判断・実測結果・調査ログ（サーバ/クライアント共通の記録） | 下記 |
 
 ## 両者の接点（これ以外に共有するものは無い）

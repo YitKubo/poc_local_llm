@@ -1,0 +1,19 @@
+[
+  {
+    "name": "poc_local_llm",
+    "vendor": "customendpoint",
+    "apiKey": "${input:pocLocalLlmKey}",
+    "apiType": "chat-completions",
+    "models": [
+      {
+        "id": "local-qwen",
+        "name": "local-qwen (poc_local_llm)",
+        "url": "http://localhost:4000/v1/chat/completions",
+        "toolCalling": true,
+        "vision": false,
+        "maxInputTokens": 8000,
+        "maxOutputTokens": 2048
+      }
+    ]
+  }
+]

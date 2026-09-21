@@ -88,8 +88,55 @@
 
 - 管理 UI の画面操作（キー発行・使用量表示）
 - Prometheus / Grafana での可視化（`/metrics` の取得までで止めている）
-- 長時間運用、複数マシンからの同時接続（すべて 1 台のローカルからの試験）
+- 長時間運用、**別の PC** からの接続（§8 で Windows ホスト → WSL2 内のサーバは確認したが、別マシンからは未実施。`netsh portproxy` / ファイアウォールは未設定）
 - N=1 の速度が §1 と §1b で食い違う原因（17〜23 vs 27.6 tok/s）
 - 実環境での `llm chat`（隔離環境では確認済み）
 - 他モデル（Llama-3.2-1B）での比較
-- 長いプロンプト（prefill）が他ユーザーの生成を止める影響
+- 長いプロンプト（prefill）が**他ユーザーの生成を止める影響**（§8 で prefill 単体の速度は測ったが、同時に走る別ユーザーへの影響は測っていない）
+- VS Code の Copilot Chat 実機での動作（§8。拡張が未導入のため API 直叩きまで）
+
+## 8. VS Code Copilot Chat 向けの前提確認（API 直叩き）
+
+VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code を触る前に API 側で切り分けた**結果。Copilot Chat 拡張が未導入だったため、実機の Ask / Agent は**まだ試していない**。手順は [../client/vscode/README.md](../client/vscode/README.md)。
+
+- 実施日: 2026-09-21。VS Code 用に別のキー（`vscode`）を発行して使用。
+
+### 到達性
+
+- Windows ホストから `curl.exe http://localhost:4000/health/liveliness` → 200。`http://172.23.142.25:4000`（WSL2 の IP）も 200。`.wslconfig` は `memory` / `swap` のみで、ネットワーク設定は既定のまま。
+- これにより「Windows 側の VS Code からサーバに届くか」は確認できた。**別の PC からは未確認**（§7）。
+
+### ツール呼び出し（Agent の前提）
+
+- 非ストリーミング: `tools` を付けて「東京の天気を、ツールを使って」と依頼 → `finish_reason: "tool_calls"`、`get_weather({"city": "Tokyo"})` を返した。
+- ストリーミング（Copilot が使う形）: `delta.tool_calls` が逐次チャンクで返り、引数が分割されて届く。
+- モデルが**常にツールを呼ぶとは限らない**（`client/README.md` の記述どおり、断ることがある）。上は 2 回とも呼んだが、2 回では頻度は分からない。
+
+### プロンプト処理（prefill）の遅さ ← Agent で最も効きそうな点
+
+| 入力トークン数 | 最初の文字まで (s) | prefill 速度 (tok/s) |
+|---:|---:|---:|
+| 173（ツール定義のみの短い依頼） | 約 3.0 | 58 |
+| 1,127 | 27.0 | 42 |
+| 4,457 | 83.0 | 54 |
+| 8,897 | 150.1 | 59 |
+
+- 入力にほぼ比例して待つ（約 42〜59 tok/s）。**Copilot の Agent が実際に送る入力の大きさは未計測**で、システムプロンプト + ツール定義 + 会話履歴 + 添付ファイルで数千トークン級になる想定は推測にとどまる。
+- 2 回目以降のターンで llama.cpp のプロンプトキャッシュが効いて短縮されるかは未検証。
+- これを受けて、サンプル設定の `maxInputTokens` を 12000 → 8000 にした（12000 だと約 3.5 分の計算）。
+
+### エラーの出方（手順書の切り分け表の根拠）
+
+| 状況 | 結果 |
+|---|---|
+| モデル名が違う（`wrong-name`） | **403** `key not allowed to access model. This key can only access models=['local-qwen']` |
+| キーが違う | 401 `Authentication Error, Invalid proxy server token passed` |
+| `/v1/chat/completions`（正） | 200 |
+| `/chat/completions`（`/v1` 無し） | 200（LiteLLM は両方受ける） |
+| `/v1` だけ | 404 |
+
+### 未実施
+
+- 実機の Ask / Agent / Edit の動作、体感速度、Copilot が並行して投げるリクエストでの 429 の出方（Copilot Chat 拡張の導入後に実施）
+- `chat.utilityModel` / `chat.utilitySmallModel` にローカルモデルを指定した書式が効くか
+- `${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか（VS Code の文書の記述に従っただけ）

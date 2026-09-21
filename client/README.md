@@ -1,6 +1,6 @@
 # client — CLI クライアント
 
-[`llm`](https://llm.datasette.io)（Simon Willison 製の既製 CLI）を導入し、サーバに接続する設定を書くだけ。**このディレクトリだけで完結**し、`server/` のファイルは何も使わない。サーバ側の手順は [../server/README.md](../server/README.md)。
+[`llm`](https://llm.datasette.io)（Simon Willison 製の既製 CLI）を導入し、サーバに接続する設定を書くだけ。**このディレクトリだけで完結**し、`server/` のファイルは何も使わない。サーバ側の手順は [../server/README.md](../server/README.md)。VS Code の GitHub Copilot Chat から使うときは [vscode/README.md](vscode/README.md)。
 
 ## 必要なもの
 
@@ -106,7 +106,7 @@ llm keys set local-llm       # 仮想キーを貼り付ける
 llm models default local
 ```
 
-`llm` を使わず、OpenAI 互換 API なら他のクライアントからも使える:
+`llm` を使わず、OpenAI 互換 API なら他のクライアントからも使える（VS Code の Copilot Chat への登録は [vscode/README.md](vscode/README.md)）:
 
 ```bash
 curl http://<サーバのホスト>:4000/v1/chat/completions \
