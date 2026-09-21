@@ -93,11 +93,11 @@
 - 実環境での `llm chat`（隔離環境では確認済み）
 - 他モデル（Llama-3.2-1B）での比較
 - 長いプロンプト（prefill）が**他ユーザーの生成を止める影響**（§8 で prefill 単体の速度は測ったが、同時に走る別ユーザーへの影響は測っていない）
-- VS Code の Copilot Chat 実機での動作（§8。拡張が未導入のため API 直叩きまで）
+- VS Code の Copilot Chat 実機での動作（§8。API 直叩きまで）
 
 ## 8. VS Code Copilot Chat 向けの前提確認（API 直叩き）
 
-VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code を触る前に API 側で切り分けた**結果。Copilot Chat 拡張が未導入だったため、実機の Ask / Agent は**まだ試していない**。手順は [../client/vscode/README.md](../client/vscode/README.md)。
+VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code を触る前に API 側で切り分けた**結果。実機の Ask / Agent は**まだ試していない**（なお Copilot Chat は VS Code 1.135 に組み込み済みで、追加導入は不要。当初「未導入」と書いたのは、拡張の一覧に出ないのを見た誤り）。手順は [../client/vscode/README.md](../client/vscode/README.md)。
 
 - 実施日: 2026-09-21。VS Code 用に別のキー（`vscode`）を発行して使用。
 
@@ -137,6 +137,6 @@ VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code �
 
 ### 未実施
 
-- 実機の Ask / Agent / Edit の動作、体感速度、Copilot が並行して投げるリクエストでの 429 の出方（Copilot Chat 拡張の導入後に実施）
+- 実機の Ask / Agent / Edit の動作、体感速度、Copilot が並行して投げるリクエストでの 429 の出方（VS Code での登録後に実施）
 - `chat.utilityModel` / `chat.utilitySmallModel` にローカルモデルを指定した書式が効くか
 - `${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか（VS Code の文書の記述に従っただけ）

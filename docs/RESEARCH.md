@@ -17,7 +17,7 @@
 | `llm` CLI で自前エンドポイントを使う設定 | https://llm.datasette.io/en/stable/other-models.html | 文書を取得 + **実機で確認**（one-shot / パイプ / chat） |
 | モデル Qwen2.5-1.5B-Instruct GGUF | https://huggingface.co/bartowski/Qwen2.5-1.5B-Instruct-GGUF | **実機で確認**（ダウンロードして推論。941MB） |
 | Docker イメージ | `ghcr.io/ggml-org/llama.cpp:server`、`ghcr.io/berriai/litellm:main-stable`、`postgres:16-alpine` | **実機で確認**（pull して起動） |
-| VS Code Copilot Chat に自前の OpenAI 互換エンドポイントを登録（Custom Endpoint、`chatLanguageModels.json`、`vendor: customendpoint`、`apiType`、`toolCalling`、`chat.utilityModel`） | https://code.visualstudio.com/docs/agent-customization/language-models / https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/agent-customization/language-models.md | 文書を取得（要約）。**API 側の前提は実機で確認**（RESULTS §8）。**VS Code 実機での登録・動作は未確認**（拡張が未導入） |
+| VS Code Copilot Chat に自前の OpenAI 互換エンドポイントを登録（Custom Endpoint、`chatLanguageModels.json`、`vendor: customendpoint`、`apiType`、`toolCalling`、`chat.utilityModel`） | https://code.visualstudio.com/docs/agent-customization/language-models / https://raw.githubusercontent.com/microsoft/vscode-docs/main/docs/agent-customization/language-models.md | 文書を取得（要約）。**API 側の前提は実機で確認**（RESULTS §8）。**VS Code 実機での登録・動作は未確認** |
 | BYOK では inline suggestions / semantic search / embeddings が使えない | 同上 | 文書を取得（要約）。実機では未確認 |
 | BYOK の概要（2026-06） | https://code.visualstudio.com/blogs/2026/06/18/byok-vscode | 検索結果のみ |
 | WSL2 の localhost 転送と VS Code（`.wslconfig` の `localhostForwarding` / `networkingMode=mirrored`） | 検索結果内の記述（出典ページは未取得） | 検索結果のみ。**Windows → WSL2 の localhost 到達は実機で確認**（RESULTS §8）。mirrored モードと VS Code の相性問題という記述は未検証で、本リポジトリの環境では mirrored を使っていない |

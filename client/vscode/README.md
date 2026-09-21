@@ -20,7 +20,7 @@ cd server && ./scripts/create_keys.sh vscode     # 出力された sk-... を受
 
 ## 導入
 
-0. VS Code に **GitHub Copilot Chat** 拡張を入れる（拡張なしではチャット UI が無い）。
+0. **GitHub Copilot Chat が使えること。** 最近の VS Code（1.135 で確認）は Copilot Chat が本体に組み込みで、拡張の追加は要らない（`code --list-extensions` に出ないのはそのため）。古い VS Code では拡張 `GitHub.copilot-chat` を入れる。
 1. コマンドパレット → `Chat: Manage Language Models` → `Add Models` → `Custom Endpoint`。`chatLanguageModels.json` が開く。
 2. [chatLanguageModels.sample.json](chatLanguageModels.sample.json) の内容を貼る（すでに他のプロバイダがあれば、配列の要素として 1 つ足す）。
 3. `apiKey` は `${input:pocLocalLlmKey}` のまま。初回利用時にキーの入力を求められるので `sk-...` を入れる。生のキーをファイルに書かずに済む。
