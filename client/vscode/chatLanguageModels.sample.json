@@ -2,7 +2,7 @@
   {
     "name": "poc_local_llm",
     "vendor": "customendpoint",
-    "apiKey": "sk-REPLACE_WITH_YOUR_VSCODE_KEY",
+    "apiKey": "unused",
     "apiType": "chat-completions",
     "models": [
       {
@@ -14,7 +14,7 @@
         "maxInputTokens": 8000,
         "maxOutputTokens": 2048,
         "requestHeaders": {
-          "Authorization": "Bearer ${apiKey}"
+          "Authorization": "Bearer sk-REPLACE_WITH_YOUR_VSCODE_KEY"
         }
       }
     ]

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Block a commit that ADDS something shaped like a virtual key (sk-...), so a key pasted into a
+# tracked file cannot be committed by accident. The placeholder sk-REPLACE_... is allowed.
+# Enable once per clone:  git config core.hooksPath .githooks
+hits="$(git diff --cached -U0 --no-color | grep -E '^\+[^+]' | grep -E 'sk-[A-Za-z0-9_-]{16,}' | grep -v 'REPLACE' || true)"
+if [ -n "$hits" ]; then
+  echo "ERROR: this commit adds something that looks like an API key (sk-...):" >&2
+  printf '%s\n' "$hits" | sed -E 's/(sk-[A-Za-z0-9]{3})[A-Za-z0-9_-]*/\1...(masked)/g' | head -5 >&2
+  echo "Keys belong only in client/vscode/.env (gitignored). Unstage/remove it, then commit again." >&2
+  exit 1
+fi

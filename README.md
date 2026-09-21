@@ -49,4 +49,5 @@ llm "こんにちは"
 
 - [docs/DECISIONS.md](docs/DECISIONS.md) — どの既存の仕組みを採用し、何を却下し、なぜそう判断したか（ADR）。実測で想定が覆った箇所は「訂正」として残している
 - [docs/RESULTS.md](docs/RESULTS.md) — 実測値と、未検証のものの一覧
+- [docs/VSCODE_SETUP.md](docs/VSCODE_SETUP.md) — VS Code の Copilot Chat に接続したときの設定記録（実際に行った設定、失敗と原因、未確認の一覧、元に戻し方）
 - [docs/RESEARCH.md](docs/RESEARCH.md) — 出典 URL と、確認の深さ（実機で確認 / 文書を取得 / 検索結果のみ）

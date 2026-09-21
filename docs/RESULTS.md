@@ -139,9 +139,14 @@ VS Code の Copilot Chat（Custom Endpoint）から使えるかを、**VS Code �
 
 - 実機の Ask / Agent / Edit の動作、体感速度、Copilot が並行して投げるリクエストでの 429 の出方（VS Code での登録後に実施）
 - `chat.utilityModel` / `chat.utilitySmallModel` にローカルモデルを指定した書式が効くか
-- ~~`${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか~~ → **動かなかった（実機）**。任意の名前（`${input:pocLocalLlmKey}`）だと、キーの入力を求められず、LiteLLM に 401 が 2 件届いた。VS Code が解決するのは `chat.lm.secret.` で始まる名前だけ（workbench の `SECRET_KEY_PREFIX` を確認）。サンプルは `apiKey` に直接キーを書く形に改めた。
+- ~~`${input:...}` によるキー入力が `chatLanguageModels.json` でそのまま動くか~~ → **動かなかった（実機）**。`apiKey` に `${input:pocLocalLlmKey}` を書いても、平文のキーを書いても、LiteLLM に `Malformed API Key passed in. Ensure Key has Bearer prefix` の 401 が届いた。
+  - 原因（VS Code 1.138.0 の workbench と Copilot 拡張のコードで確認）: `apiKey` は「秘密の値」で、`${input:chat.lm.secret.…}` の参照から暗号化された保管場所を引く。参照でない文字列は空になり、拡張は `Authorization: Bearer ` だけを送る。`Authorization: Bearer ` を直接送ると同じエラーが再現する。
+  - 対処: 認証ヘッダを `requestHeaders` に直接書く（`"Authorization": "Bearer sk-..."`）。この形で `POST /v1/chat/completions` が 200 になった。`Bearer ${apiKey}` は空のキーが入るだけで効かない。サンプルはこの形に改めた。
+  - 副作用: キーがプロファイルの `chatLanguageModels.json` に平文で残る。
 
 ### VS Code 実機での初回試行（1.138.0、`local-llm` プロファイル、2026-09-22）
 
 - モデルピッカーに `local-qwen (poc_local_llm)` が出て、選択できた（登録は成功）。
-- 上記のとおり 401。あわせて Copilot 拡張が送信前にプロンプトを組み立てられず `No lowest priority node found` で失敗した（サーバには届いていない）。プロンプトの固定部分（システムプロンプト + ツール定義）が `maxInputTokens: 8000` に収まらないと見られる。原因の切り分けは次の節。
+- 上記のとおり 401 が続いた。最初の試行では、Copilot 拡張が送信前にプロンプトを組み立てられず `No lowest priority node found` で失敗した（サーバには届いていない）。**原因は未確認**（プロンプトの固定部分が `maxInputTokens: 8000` に収まらなかった可能性がある、というのは推測）。
+- 認証を直した後の Ask モードの「こんにちは」: `POST /v1/chat/completions` が 200。llama.cpp のログでは、入力の処理が 2,047 トークンで進捗 23%、4,094 トークンで 47%（約 42〜48 tok/s）。**入力は合計約 8,700 トークン**と逆算でき、最初の文字まで約 3 分を要する見込み。同じ「こんにちは」を端末の `llm` CLI から送ると数秒。差はすべて、Copilot が毎回付ける文脈（システムプロンプト・ツール定義・環境情報など）による入力の大きさ。内訳の比率は未測定。
+- 未確認: 上記リクエストが最後まで返ったときの所要時間、2 通目以降でプロンプトキャッシュが効いて短縮されるか、ツールを減らしたときの入力の大きさ。

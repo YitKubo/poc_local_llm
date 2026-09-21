@@ -2,6 +2,8 @@
 
 VS Code の Copilot Chat のモデルを、このリポジトリのサーバの `local-qwen` に差し替える。Copilot Chat の **Custom Endpoint**（BYOK）に OpenAI 互換の URL を登録するだけで、サーバ側は何も変えない。`llm` CLI（[../README.md](../README.md)）とは独立した、もう 1 つのクライアント。
 
+この環境で実際に行った設定・失敗と原因の記録は [../../docs/VSCODE_SETUP.md](../../docs/VSCODE_SETUP.md)。
+
 **先に結論**: Ask（質問）は使える見込み。Agent は API としては通る（実測済み）が、**入力が長いと最初の文字が出るまで数分かかる**ため、実用になるかは実機で試して判断する。インライン補完（Tab）は BYOK では使えない。
 
 ## 必要なもの
@@ -20,17 +22,40 @@ cd server && ./scripts/create_keys.sh vscode     # 出力された sk-... を受
 
 ## 導入
 
+キーは**追跡対象のファイルに書かない**。`.env`（git に入らない）にだけ書き、`apply.sh` が VS Code の設定ファイルを生成する。VS Code は環境変数を直接読めない（`${env:...}` は使えない）ので、`.env` → 設定ファイルの橋渡しをスクリプトが行う。
+
 0. **GitHub Copilot Chat が使えること。** 最近の VS Code（1.135 で確認）は Copilot Chat が本体に組み込みで、拡張の追加は要らない（`code --list-extensions` に出ないのはそのため）。古い VS Code では拡張 `GitHub.copilot-chat` を入れる。
-1. コマンドパレット → `Chat: Manage Language Models` → `Add Models` → `Custom Endpoint`。`chatLanguageModels.json` が開く。
-2. [chatLanguageModels.sample.json](chatLanguageModels.sample.json) の内容を貼る（すでに他のプロバイダがあれば、配列の要素として 1 つ足す）。
-3. `apiKey` の `sk-REPLACE_WITH_YOUR_VSCODE_KEY` を、受け取った VS Code 専用のキーに置き換える。**キーはこのファイルに平文で残る**（VS Code のプロファイルのフォルダ内で、リポジトリには入らない）。専用キーは同時 2 本・日次の予算つきに絞ってあるので、漏れても被害は小さい。
-   - 平文を避けたいときは、`Chat: Manage Language Models` の画面から `Add Models` → `Custom Endpoint` の流れで追加する。VS Code がキーを安全な保管場所に入れ、ファイルには `${input:chat.lm.secret.…}` という参照だけを書く。
-   - **`${input:好きな名前}` は使えない。** VS Code が解決するのは `chat.lm.secret.` で始まる名前だけで、任意の名前を書くとキーが送られず 401 になる（実機で確認）。
-4. チャットのモデルピッカーから `local-qwen (poc_local_llm)` を選ぶ。
+1. **（推奨）専用プロファイルを作る。** ユーザー設定にターミナルの自動承認（`rm` など）がある場合、1.5B のモデルの Agent にも効いてしまうため。コマンドパレット → `Profiles: Create Profile...` → 名前 `local-llm`、テンプレート `Empty`。既定プロファイルに入れるなら、この手順は不要（`.env` の `VSCODE_PROFILE` を空にする）。
+2. `.env` を作って編集する。
 
-サーバが別マシンなら、サンプルの `url` の `localhost` をそのホスト名に変える。URL は `/v1/chat/completions` まで書く。
+   ```bash
+   cd client/vscode
+   cp .env.example .env
+   # .env を開き、LLM_SERVER_KEY を受け取ったキーに、LLM_SERVER_URL をサーバの URL にする
+   ```
 
-### 手で編集する場合の場所
+3. 生成する。
+
+   ```bash
+   ./apply.sh --dry-run    # 書き込み先と結果を確認（キーは伏せて表示）
+   ./apply.sh              # VS Code の chatLanguageModels.json に poc_local_llm を追加・更新
+   ```
+
+   - 書き込み先（プロファイルのフォルダ）は自動で見つける（WSL は Windows 側の `%APPDATA%\Code\User`）。見つからなければ `.env` の `VSCODE_USER_DIR` で指定する。
+   - 同じファイルにある**ほかのプロバイダの設定は残す**。ほかの設定があったファイルは、書く前に `.bak` に控える。何度実行しても同じ結果になる。
+   - キーやモデル名などを変えたときは、`.env` を直してもう一度 `./apply.sh`。
+   - やめるときは `./apply.sh --uninstall`（`poc_local_llm` の分だけ消す）。
+4. チャットの入力欄にカーソルを置いて `Ctrl+Alt+.`（モデルの選択）から `local-qwen (poc_local_llm)` を選ぶ。
+
+### キーを誤ってコミットしないために
+
+- キーが入るのは **`client/vscode/.env`（`.gitignore` 済み）と、VS Code のプロファイルのフォルダ**（リポジトリの外）だけ。`chatLanguageModels.sample.json` は `apply.sh` が読むテンプレートで、**編集しない**（プレースホルダ `sk-REPLACE_...` のまま）。
+- 念のため pre-commit フック（`.githooks/pre-commit`）が、`sk-...` の形の文字列を追加するコミットを止める。クローンごとに 1 回だけ有効にする: `git config core.hooksPath .githooks`
+- **キーは平文で残る**（`.env` と、生成された `chatLanguageModels.json`）。専用キーは同時 2 本・日次の予算つきに絞ってあるので、漏れても被害は小さい。漏れたと思ったら、サーバで `./scripts/create_keys.sh --rotate vscode`（古いキーは無効になる）。
+- **`apiKey` の欄に平文のキーを書いても使われない。** VS Code は `apiKey` を暗号化した保管場所（`${input:chat.lm.secret.…}` の参照）から取り出す作りで、平文の文字列は空として扱う。空だと `Authorization: Bearer ` だけが送られ、LiteLLM が `Malformed API Key passed in` の 401 を返す（実機で確認）。`${input:好きな名前}` も同じ理由で使えない。そのため、キーは `requestHeaders` の `Authorization` に入れている。
+- 平文を避けたいときは、`Chat: Manage Language Models` の画面から `Add Models` → `Custom Endpoint` で追加し、キーを画面から入れる（VS Code が保管場所に入れる）。この経路は**未検証**。
+
+### 手で編集する場合の場所（`apply.sh` を使わないとき）
 
 | 環境 | パス |
 |---|---|
@@ -38,9 +63,9 @@ cd server && ./scripts/create_keys.sh vscode     # 出力された sk-... を受
 | macOS | `~/Library/Application Support/Code/User/chatLanguageModels.json` |
 | Linux | `~/.config/Code/User/chatLanguageModels.json` |
 
-Remote-WSL で使う場合も、ユーザー設定は Windows 側のこのファイル。コマンドパレットから開くのが確実。
+Remote-WSL で使う場合も、ユーザー設定は Windows 側のこのファイル。コマンドパレットから開くのが確実。プロファイルを使う場合は、`profiles\<フォルダ名>\chatLanguageModels.json`（フォルダ名は `globalStorage\storage.json` の `userDataProfiles` に載っている）。手で書くときも、キーを入れるのは**この生成先のファイルだけ**で、`chatLanguageModels.sample.json` には書かない。
 
-### サンプルの数字の根拠
+### サンプルの数字の根拠（`.env` の `MAX_INPUT_TOKENS` などで変えられる）
 
 | 項目 | 値 | 理由 |
 |---|---|---|
@@ -86,7 +111,8 @@ BYOK のモデルだけなら GitHub アカウント／サブスクリプショ�
 
 | 症状 | 見るところ |
 |---|---|
-| 401 | キーが違う。`apiKey` に `${input:…}` の任意名を書いていないか（上記）、または `llm` CLI 用のキーを渡していないか。`curl -H "Authorization: Bearer sk-..." http://localhost:4000/v1/models` で `local-qwen` が見えるか |
+| 401（`Malformed API Key ... Bearer prefix`） | キーが空で送られている。`requestHeaders` の `Authorization` に `Bearer sk-...` を直接書いているか（`apiKey` 欄では効かない。上記）。 |
+| 401（`Invalid proxy server token`） | キーが違う。`llm` CLI 用のキーを渡していないか。`curl -H "Authorization: Bearer sk-..." http://localhost:4000/v1/models` で `local-qwen` が見えるか |
 | 404 | `url` が `/v1/chat/completions` まで含んでいるか（`/v1` で止めると 404。`/chat/completions` だけでも通るが、`/v1` 付きに揃える） |
 | 403 `key not allowed to access model` | `id` が `local-qwen` と一致しているか。キーはこのモデルにしか許可されていない |
 | 429 | 同時 2 本を超えた。少し待って再送。他のクライアントと同じキーを使っていないか |
@@ -96,4 +122,10 @@ BYOK のモデルだけなら GitHub アカウント／サブスクリプショ�
 
 ## 元に戻す
 
-`chatLanguageModels.json` から `poc_local_llm` の要素を消す（ほかに何も無ければ `[]` に戻す）。`client/uninstall.sh` はこのファイルを触らないので対象外。発行した `vscode` キーを無効にするなら、サーバ側で `./scripts/create_keys.sh --rotate vscode` で作り直すか、管理 UI から削除する。
+```bash
+cd client/vscode && ./apply.sh --uninstall     # poc_local_llm の分だけ消す（ほかのプロバイダは残る）
+```
+
+- `.env` は自分で消す（`rm client/vscode/.env`）。プロファイルごと消すなら、コマンドパレットの `Profiles: Delete Profile...`。
+- `client/uninstall.sh` はこの設定を触らないので対象外。
+- 発行した `vscode` キーを無効にするなら、サーバ側で `./scripts/create_keys.sh --rotate vscode` で作り直すか、管理 UI から削除する。
